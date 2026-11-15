@@ -14,7 +14,7 @@ To publish an already-tested local build with GitHub CLI:
 ```bash
 sha256sum dist/*.AppImage > dist/SHA256SUMS
 # Run from the repository after pushing its version tag.
-gh release create v0.1.0 dist/*.AppImage dist/SHA256SUMS --title 'Omarchy Theme Studio 0.1.0' --notes-file docs/RELEASE-NOTES.md
+gh release create v0.2.0 dist/*.AppImage dist/SHA256SUMS --title 'Omarchy Theme Studio 0.2.0' --notes-file docs/RELEASE-NOTES.md
 ```
 
 Production dependencies are limited to `jsonc-parser`. Run `npm audit --omit=dev` for the shipped dependency tree. Electron-builder also pulls development-only Windows/macOS packaging dependencies; review those separately when updating the build toolchain.

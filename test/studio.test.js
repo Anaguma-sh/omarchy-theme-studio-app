@@ -73,10 +73,10 @@ test('AI accepts validated palette data and rejects insecure endpoints or malfor
   let request;
   const fetcher=async(_url,options)=>{request=JSON.parse(options.body);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(variants())}}]}));};
   assert.equal((await suggest({endpoint:'http://localhost:11434/v1/chat/completions',model:'local',brief:'green',samples:['#abcdef']},fetcher)).length,3);
-  assert.match(request.messages[1].content,/#abcdef/);assert.doesNotMatch(JSON.stringify(request),/wallpaper\.png/);
+  assert.match(request.messages[0].content,/#abcdef/);assert.doesNotMatch(JSON.stringify(request),/wallpaper\.png/);
   await assert.rejects(suggest({endpoint:'http://example.com',model:'x',brief:'x'},fetcher),/HTTPS/);
   await assert.rejects(suggest({endpoint:'https://user:pass@example.com',model:'x',brief:'x'},fetcher),/credentials/);
-  await assert.rejects(suggest({endpoint:'https://example.com',model:'x',brief:'x'},async()=>new Response(JSON.stringify({choices:[{message:{content:'[{"palette":{}}]'}}]}))),/three palettes/);
+  await assert.rejects(suggest({endpoint:'https://example.com',model:'x',brief:'x'},async()=>new Response(JSON.stringify({choices:[{message:{content:'[{"palette":{}}]'}}]}))),/three-palette/);
 });
 test('undo protects edits to the installed theme',async t=>{
   const {system}=await fixture(t);await system.apply(project);await fs.appendFile(path.join(system.userThemes,'test-forest/colors.toml'),'\n# user change');await assert.rejects(system.undo(),/edited outside Studio/);assert.ok((await system.inventory()).undo);

@@ -1,10 +1,13 @@
-import {app,BrowserWindow,ipcMain,dialog,nativeImage,session} from 'electron';
+import {app,BrowserWindow,ipcMain,dialog,nativeImage,session,clipboard} from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {StudioSystem,slug} from './system.js';
 import {suggest} from './ai.js';
-import {validate,complete} from './palette.js';
+import {AgentRunner,installedAgents} from './agents.js';
+import {buildPrompt} from './agent-protocol.js';
+const runner=new AgentRunner();
+import {validate,complete,variants} from './palette.js';
 const root=path.dirname(fileURLToPath(import.meta.url)),smoke=process.argv.includes('--smoke-test');
 if(smoke)app.setPath('userData',process.env.STUDIO_TEST_DATA||'/tmp/omarchy-studio-smoke');
 let win,system,busy=false;const allowedImages=new Map();
@@ -77,6 +80,10 @@ handle('undo',async()=>{
 },true);
 handle('keep',()=>system.keep(),true);
 handle('ai',options=>suggest(options));
+handle('agents',()=>installedAgents());
+handle('runAgent',options=>{if(smoke)throw new Error('External agent runs are disabled in smoke tests.');return runner.run(options);});
+handle('cancelAgent',()=>runner.cancel());
+handle('copyPrompt',options=>{clipboard.writeText(buildPrompt(options));return true;});
 await win.loadFile(path.join(root,'index.html'));
 if(smoke) {
   try {
@@ -90,9 +97,11 @@ if(smoke) {
     }finally{await fs.rm(temporary,{recursive:true,force:true});}
     await new Promise(resolve=>setTimeout(resolve,300));
     await fs.writeFile(path.join(app.getPath('userData'),'smoke.png'),(await win.webContents.capturePage()).toPNG());
-    const result=await win.webContents.executeJavaScript(`new Promise((resolve,reject)=>{let n=0;const timer=setInterval(()=>{if(document.querySelectorAll('.palette-card').length===3){clearInterval(timer);try{document.querySelectorAll('.palette-card')[1].click();document.querySelector('#mode').click();if(document.querySelector('#advanced').hidden)throw Error('Advanced editor hidden');document.querySelector('[data-step="3"]').click();if(document.querySelector('#step3').hidden)throw Error('Review not visible');resolve({cards:3,advanced:true,review:true,title:document.title});}catch(e){reject(e);}}else if(++n>100){clearInterval(timer);reject(Error('UI did not load'));}},100);})`);
+    const reply=JSON.stringify(variants());
+    const result=await win.webContents.executeJavaScript(`new Promise((resolve,reject)=>{let n=0;const timer=setInterval(()=>{if(document.querySelectorAll('.palette-card').length===3){clearInterval(timer);try{document.querySelector('#connection-mode').value='manual';document.querySelector('#connection-mode').dispatchEvent(new Event('change'));if(document.querySelector('#manual-connection').hidden)throw Error('Manual connection hidden');document.querySelector('#brief').value='Smoke test theme';document.querySelector('#brief').dispatchEvent(new Event('input'));if(!document.querySelector('#portable-prompt').value.includes('Smoke test theme'))throw Error('Portable request missing prompt');document.querySelector('#agent-response').value=${JSON.stringify(reply)};document.querySelector('#import-response').click();if(document.querySelector('#step1').hidden)throw Error('Imported palettes not shown');document.querySelectorAll('.palette-card')[1].click();document.querySelector('#mode').click();if(document.querySelector('#advanced').hidden)throw Error('Advanced editor hidden');document.querySelector('[data-step="3"]').click();if(document.querySelector('#step3').hidden)throw Error('Review not visible');resolve({cards:3,advanced:true,review:true,manualExchange:true,title:document.title});}catch(e){reject(e);}}else if(++n>100){clearInterval(timer);reject(Error('UI did not load'));}},100);})`);
     console.log('STUDIO_SMOKE_OK',JSON.stringify(result));app.exit(0);
   }catch(error){console.error(error);app.exit(1);}
 }
 }).catch(error=>{console.error(error);app.exit(1);});
+app.on('before-quit',()=>runner.cancel());
 app.on('window-all-closed',()=>app.quit());

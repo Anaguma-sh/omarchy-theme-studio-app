@@ -1,8 +1,9 @@
 import {roles,complete,variants,checks,readable,mix} from './palette.js';
+import {buildPrompt,parsePalettes} from './agent-protocol.js';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const state={wallpapers:[],options:variants(),selected:0,palette:complete(),step:0,advanced:false,inventory:null};state.palette={...state.options[0].palette};
 const titles=['Start with a little inspiration.','Three directions. One desktop.','Small details. Your signature.','Ready for a change of scenery?'];
-const helps=['Start with wallpapers or an installed theme. To generate a theme from a prompt, connect your own AI provider.','Compare the same terminal, selection, borders and shell pill in each palette.','Fine-tune your colours and check readability before you apply.','Export a portable theme, or install it here with a way back.'];
+const helps=['Start with wallpapers or an installed theme. For prompts, use your own signed-in agent, AI app or provider.','Compare the same terminal, selection, borders and shell pill in each palette.','Fine-tune your colours and check readability before you apply.','Export a portable theme, or install it here with a way back.'];
 const esc=text=>String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let toast;
 function status(text,error=false){clearTimeout(toast);$('#status').textContent=text;$('#status').classList.toggle('error',error);$('#status').hidden=!text;if(!error)toast=setTimeout(()=>{$('#status').hidden=true;},10000);}
@@ -12,7 +13,7 @@ function mock(p,large=false){const wallpaper=state.wallpapers[0]?.thumbnail;cons
   return `<div class="mock ${large?'large':''}" style="${style}"><div class="shell-pill"><span>◈ &nbsp; 1 &nbsp; 2 &nbsp; 3</span><span>14:32 &nbsp; ●</span></div><div class="terminal"><div class="terminal-title">● ● ● &nbsp; terminal</div><div class="terminal-body"><em>❯</em> echo hello, omarchy\n<span style="color:${p.green}">hello, omarchy</span>\n<span style="color:${p.muted}"># a place to make things</span>\n<span class="selected-text"> selected text </span>\n<em>❯</em> ▍</div></div><div class="inactive-window">Inactive window · quiet, still visible</div></div>`;}
 function renderCards(){const container=$('#palettes');container.innerHTML='';state.options.forEach((option,i)=>{const card=document.createElement('button');card.className='palette-card'+(i===state.selected?' chosen':'');card.setAttribute('aria-pressed',String(i===state.selected));card.innerHTML=mock(option.palette)+`<div class="card-info"><strong>${esc(option.name)} ${i===state.selected?'✓':''}</strong><div class="swatches">${roles.slice(0,6).map(k=>`<span style="background:${option.palette[k]}"></span>`).join('')}</div><div class="hex-row">${['background','foreground','accent'].map(k=>esc(option.palette[k])).join(' · ')}<br>${checks(option.palette).every(c=>c.pass)?'Text contrast passes':'Review text contrast'}</div></div>`;card.onclick=()=>{state.selected=i;state.palette={...option.palette};renderCards();renderEditor();};container.append(card);});}
 function local(){state.options=variants(state.wallpapers.flatMap(w=>w.samples));state.selected=0;state.palette={...state.options[0].palette};renderCards();renderEditor();}
-function images(){const target=$('#wallpaper-list');target.innerHTML='';state.wallpapers.forEach(w=>{const img=document.createElement('img');img.src=w.thumbnail;img.alt=w.name;img.title=w.name;target.append(img);});$('#clear-images').hidden=!state.wallpapers.length;}
+function images(){portablePrompt();const target=$('#wallpaper-list');target.innerHTML='';state.wallpapers.forEach(w=>{const img=document.createElement('img');img.src=w.thumbnail;img.alt=w.name;img.title=w.name;target.append(img);});$('#clear-images').hidden=!state.wallpapers.length;}
 function renderEditor(){ $('#live-preview').innerHTML=mock(state.palette,true);for(const [target,keys] of [['#basic-colors',roles.slice(0,5)],['#semantic-colors',roles.slice(5)]]){
   $(target).innerHTML='';for(const key of keys){const row=document.createElement('div');row.className='color-field';row.innerHTML=`<input type="color" id="pick-${key}" value="${state.palette[key]}" aria-label="Choose ${key}"><label for="hex-${key}">${key}</label><input type="text" id="hex-${key}" value="${state.palette[key]}" aria-label="${key} hex value" maxlength="7" spellcheck="false">`;const picker=row.querySelector('[type=color]'),text=row.querySelector('[type=text]');const change=value=>{if(!/^#[a-f\d]{6}$/i.test(value)){text.setCustomValidity('Use # followed by six hex digits.');text.reportValidity();text.value=state.palette[key];return;}text.setCustomValidity('');state.palette[key]=value.toLowerCase();picker.value=value;text.value=value;$('#live-preview').innerHTML=mock(state.palette,true);renderChecks();state.options[state.selected].palette={...state.palette};renderCards();};picker.oninput=()=>change(picker.value);text.onchange=()=>change(text.value);$(target).append(row);}}
   $('#advanced').open=state.advanced;renderChecks();}
@@ -26,11 +27,39 @@ $('#wallpapers').onclick=()=>task($('#wallpapers'),async()=>{const result=await 
 $('#clear-images').onclick=()=>{state.wallpapers=[];images();local();};
 $('#base').onchange=()=>{const theme=state.inventory.themes.find(t=>t.name===$('#base').value);if(!theme)return;state.options=[{name:theme.name,palette:{...theme.palette}},...variants([theme.palette.accent]).slice(1)];state.selected=0;state.palette={...theme.palette};renderCards();renderEditor();go(1);};
 $('#regenerate').onclick=()=>{local();status('Three local palettes generated.');};
-$('#generate-ai').onclick=()=>task($('#generate-ai'),async()=>{state.options=await window.studio.ai({endpoint:$('#endpoint').value.trim(),model:$('#model').value.trim(),key:$('#key').value,brief:$('#brief').value,samples:state.wallpapers.flatMap(w=>w.samples)});state.selected=0;state.palette={...state.options[0].palette};renderCards();renderEditor();go(1);status('AI palettes ready. Check readability before applying.');});
+let agents=[],agentRunning=false;
+function promptInput(){return {brief:$('#brief').value,samples:state.wallpapers.flatMap(w=>w.samples)};}
+function portablePrompt(){try{$('#portable-prompt').value=buildPrompt(promptInput());}catch{$('#portable-prompt').value='Describe the theme you want above, then copy this request.';}}
+function connectionUI(){
+  const mode=$('#connection-mode').value,id=$('#agent').value,info=agents.find(a=>a.id===id);
+  $('#agent-connection').hidden=mode!=='agent';$('#api-connection').hidden=mode!=='api';$('#manual-connection').hidden=mode!=='manual';$('#generate-ai').hidden=mode==='manual';
+  if(!agentRunning)$('#generate-ai').textContent=mode==='agent'?'Generate with signed-in agent':'Generate with API / local server';
+  $('#custom-agent').hidden=id!=='custom';$('#agent-name-field').hidden=!['claude','opencode'].includes(id);
+  $('#agent-status').textContent=id==='custom'?'Use any harness that accepts a prompt and returns text or JSON. Configure its login in its own app.':info?`${info.installed?'Detected: '+info.path:'Not detected on PATH.'} ${info.login}`:'Checking installed agents…';
+  portablePrompt();
+}
+async function refreshAgents(){agents=await window.studio.agents();const select=$('#agent');for(const option of select.options){const info=agents.find(a=>a.id===option.value);if(info)option.textContent=info.name+(info.installed?' · installed':' · not found');}connectionUI();}
+function useAgentPalettes(options){state.options=options;state.selected=0;state.palette={...state.options[0].palette};renderCards();renderEditor();go(1);status('AI palettes ready. Check readability before applying.');}
+$('#connection-mode').onchange=connectionUI;$('#agent').onchange=connectionUI;$('#brief').oninput=portablePrompt;
+$('#refresh-agents').onclick=()=>task($('#refresh-agents'),refreshAgents);
+$('#copy-prompt').onclick=()=>task($('#copy-prompt'),async()=>{const prompt=buildPrompt(promptInput());$('#portable-prompt').value=prompt;await window.studio.copyPrompt(promptInput());status('Request copied. Send it to your AI, then paste its response below.');});
+$('#import-response').onclick=()=>{try{useAgentPalettes(parsePalettes($('#agent-response').value));}catch(e){status(e.message,true);}};
+$('#generate-ai').onclick=()=>task($('#generate-ai'),async()=>{
+  const mode=$('#connection-mode').value;
+  if(mode==='api'){$('#connection-mode').disabled=true;try{useAgentPalettes(await window.studio.ai({endpoint:$('#endpoint').value.trim(),model:$('#model').value.trim(),key:$('#key').value,...promptInput()}));}finally{$('#connection-mode').disabled=false;}return;}
+  if(mode!=='agent')return;
+  const options={...promptInput(),agent:$('#agent').value,model:$('#agent-model').value,agentName:$('#agent-name-field').hidden?'':$('#agent-name').value};
+  buildPrompt(options);
+  if(options.agent==='custom'){options.command=$('#agent-command').value;try{options.args=JSON.parse($('#agent-args').value);}catch{throw new Error('Custom arguments must be a JSON array, for example ["--print"].');}}
+  agentRunning=true;$('#cancel-agent').hidden=false;$('#connection-mode').disabled=true;status('Your agent is generating palettes using its own connection.');
+  try{useAgentPalettes(await window.studio.runAgent(options));}
+  finally{agentRunning=false;$('#cancel-agent').hidden=true;$('#connection-mode').disabled=false;connectionUI();}
+});
+$('#cancel-agent').onclick=()=>task($('#cancel-agent'),async()=>{await window.studio.cancelAgent();});
 $('#save').onclick=()=>task($('#save'),async()=>{const file=await window.studio.save(project());if(file)status('Project saved: '+file);});
 $('#open').onclick=()=>task($('#open'),async()=>{const p=await window.studio.load();if(!p)return;$('#name').value=p.name;state.wallpapers=p.wallpapers;state.palette=p.palette;state.selected=0;state.options=[{name:'Saved palette',palette:{...p.palette}},...variants(p.wallpapers.flatMap(w=>w.samples)).slice(1)];images();renderCards();renderEditor();go(2);status(p.missing.length?'Project opened. Missing wallpapers were skipped: '+p.missing.join(', '):'Project opened.',!!p.missing.length);});
 $('#export').onclick=()=>task($('#export'),async()=>{const file=await window.studio.export(project());if(file)status('Theme exported: '+file);});
 $('#apply').onclick=()=>task($('#apply'),async()=>{try{const result=await window.studio.apply(project(),$$('#apps input:checked').map(el=>el.value));if(result){$('#report-box').hidden=false;$('#report').textContent=[result.verification.paletteMatch?'Active palette matches.':'Active palette differs — review the installed theme.',result.verification.hypr,...result.report,result.verification.visual].join('\n\n');status('Theme installed. Review the apply report and your running apps.');}}finally{await inventory();}});
 $('#undo').onclick=()=>task($('#undo'),async()=>{const result=await window.studio.undo();if(result){status(result);$('#report-box').hidden=true;}await inventory();});
 $('#keep').onclick=()=>task($('#keep'),async()=>{status(await window.studio.keep());await inventory();});
-renderCards();renderEditor();images();inventory().catch(e=>status(e.message,true));
+renderCards();renderEditor();images();inventory().catch(e=>status(e.message,true));refreshAgents().catch(e=>status(e.message,true));
