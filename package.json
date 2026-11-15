@@ -1,0 +1,46 @@
+{
+  "name": "omarchy-theme-studio",
+  "version": "0.1.0",
+  "description": "A local-first Omarchy theme workshop",
+  "type": "module",
+  "main": "src/main.js",
+  "author": "Omarchy Theme Studio contributors",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "dist": "electron-builder --linux AppImage --x64 --publish never",
+    "check": "node --check src/main.js && node --check src/renderer.js && node --check src/system.js"
+  },
+  "dependencies": {
+    "jsonc-parser": "3.3.1"
+  },
+  "devDependencies": {
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "org.omarchy.themestudio",
+    "productName": "Omarchy Theme Studio",
+    "files": [
+      "src/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Utility",
+      "icon": "assets/icon.png",
+      "artifactName": "Omarchy-Theme-Studio-${version}-${arch}.${ext}",
+      "syncDesktopName": true
+    },
+    "toolsets": {
+      "appimage": "1.0.3"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Anaguma-sh/omarchy-theme-studio-app.git"
+  },
+  "desktopName": "omarchy-theme-studio"
+}
