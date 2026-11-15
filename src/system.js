@@ -84,7 +84,13 @@ export class StudioSystem {
     await this.journalFile(journal,app.settings,changed);
     return `${app.name}: theme installed and preference saved. Reload the editor to verify; existing colour customisations may override it. Cursor Agents is a separate surface.`;
   }
-  async apply(project,selected=[]) {
+  async locked(fn) {
+    await fs.mkdir(this.data,{recursive:true});const file=path.join(this.data,'operation.lock');let handle;
+    try{handle=await fs.open(file,'wx',0o600);}catch(e){if(e.code==='EEXIST')throw new Error('Another Studio theme operation is running. If Studio crashed, close its processes before removing '+file);throw e;}
+    try{return await fn();}finally{await handle.close();await fs.rm(file,{force:true});}
+  }
+  async apply(project,selected=[]) {return this.locked(()=>this.applyInternal(project,selected));}
+  async applyInternal(project,selected=[]) {
     validate(project.palette);slug(project.name);
     if(checks(project.palette).some(c=>!c.pass))throw new Error('Fix the text contrast checks before applying.');
     if(!await this.available('omarchy'))throw new Error('Omarchy is not installed. You can still export this theme.');
@@ -110,7 +116,7 @@ export class StudioSystem {
       return {report,verification:await this.verify(project.palette)};
     } catch(error) {
       if(await exists(path.join(this.data,'pending.json'))) {
-        try {await this.undo();error.message+=' Previous theme and edited files restored.';}
+        try {await this.undoInternal();error.message+=' Previous theme and edited files restored.';}
         catch(rollback) {error.message+=` Recovery is pending: ${rollback.message}. Use Undo after fixing the issue. Backups: ${this.data}`;}
       }
       throw error;
@@ -132,7 +138,8 @@ export class StudioSystem {
     }};
     await visit(directory);return files;
   }
-  async undo() {
+  async undo(){return this.locked(()=>this.undoInternal());}
+  async undoInternal() {
     const file=path.join(this.data,'pending.json');const journal=JSON.parse(await fs.readFile(file,'utf8'));
     // Refuse to overwrite files edited since this app changed them.
     for(const entry of journal.files) {
@@ -154,7 +161,8 @@ export class StudioSystem {
     await fs.rename(file,path.join(this.data,`undone-${journal.id}.json`));
     return `Restored ${journal.previous}. Reload selected editors to restore their appearance.`;
   }
-  async keep() {
+  async keep(){return this.locked(()=>this.keepInternal());}
+  async keepInternal() {
     const file=path.join(this.data,'pending.json');const j=JSON.parse(await fs.readFile(file,'utf8'));
     if(j.phase!=='applied')throw new Error('This change is incomplete. Use Undo to recover it.');
     await fs.rename(file,path.join(this.data,`kept-${j.id}.json`));return 'Change kept. Backup history remains on disk.';

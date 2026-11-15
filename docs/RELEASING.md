@@ -14,7 +14,13 @@ To publish an already-tested local build with GitHub CLI:
 ```bash
 sha256sum dist/*.AppImage > dist/SHA256SUMS
 # Run from the repository after pushing its version tag.
-gh release create v0.2.0 dist/*.AppImage dist/SHA256SUMS --title 'Omarchy Theme Studio 0.2.0' --notes-file docs/RELEASE-NOTES.md
+gh release create v0.3.0 dist/*.AppImage dist/SHA256SUMS --title 'Omarchy Theme Studio 0.3.0' --notes-file docs/RELEASE-NOTES.md
 ```
 
 Production dependencies are limited to `jsonc-parser`. Run `npm audit --omit=dev` for the shipped dependency tree. Electron-builder also pulls development-only Windows/macOS packaging dependencies; review those separately when updating the build toolchain.
+
+## Update compatibility
+
+Every stable release must include its versioned x86_64 AppImage and a `SHA256SUMS` file with a line containing that asset’s basename. The built-in updater reads the public latest-release API and only selects assets in this repository’s version-tag download path. Publish stable releases only after testing. No updater-specific manifest is required by this app’s full-download updater.
+
+Test the AppImage CLI with `DISPLAY` and `WAYLAND_DISPLAY` unset. Check `--version`, generation and export, then install under a temporary HOME and run the generated wrapper. Test update checks and a real release download in an isolated installation before declaring update support verified.

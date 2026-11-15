@@ -1,2 +1,2 @@
 const {contextBridge,ipcRenderer}=require('electron');
-contextBridge.exposeInMainWorld('studio',Object.freeze(Object.fromEntries(['inventory','wallpapers','export','apply','undo','keep','save','load','ai','agents','runAgent','cancelAgent','copyPrompt'].map(name=>[name,(...args)=>ipcRenderer.invoke('studio:'+name,...args)]))));
+contextBridge.exposeInMainWorld('studio',Object.freeze(Object.fromEntries(['inventory','wallpapers','export','apply','undo','keep','save','load','ai','agents','runAgent','cancelAgent','copyPrompt','appStatus','autoCheck','installApp','checkUpdate','downloadUpdate','rollbackApp','restartApp'].map(name=>[name,(...args)=>ipcRenderer.invoke('studio:'+name,...args)]))));

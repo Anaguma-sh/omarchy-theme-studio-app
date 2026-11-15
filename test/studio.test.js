@@ -81,3 +81,6 @@ test('AI accepts validated palette data and rejects insecure endpoints or malfor
 test('undo protects edits to the installed theme',async t=>{
   const {system}=await fixture(t);await system.apply(project);await fs.appendFile(path.join(system.userThemes,'test-forest/colors.toml'),'\n# user change');await assert.rejects(system.undo(),/edited outside Studio/);assert.ok((await system.inventory()).undo);
 });
+test('desktop and CLI theme operations share an exclusive lock',async t=>{
+  const {system}=await fixture(t);let release;const blocked=new Promise(resolve=>{release=resolve;});const first=system.locked(()=>blocked);await new Promise(resolve=>setTimeout(resolve,15));await assert.rejects(system.apply(project),/Another Studio theme operation/);release();await first;assert.equal(await fs.stat(path.join(system.data,'operation.lock')).catch(()=>null),null);
+});

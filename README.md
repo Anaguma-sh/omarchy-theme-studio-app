@@ -4,16 +4,54 @@ A standalone Linux desktop app for designing and applying Omarchy themes. Start 
 
 ## Download and run
 
-Download **Omarchy-Theme-Studio-0.2.0-x86_64.AppImage** from [GitHub Releases](https://github.com/Anaguma-sh/omarchy-theme-studio-app/releases/latest).
+Download **Omarchy-Theme-Studio-0.3.0-x86_64.AppImage** from [GitHub Releases](https://github.com/Anaguma-sh/omarchy-theme-studio-app/releases/latest).
 
-In your file manager, allow the file to run as a program, then open it. Or use:
+Allow the file to run as a program and open it. Choose **Install & updates → Install on this computer**. Studio creates a permanent installation, desktop launcher and `omarchy-theme-studio` terminal command. No administrator password is needed.
+
+Or install directly from a terminal:
 
 ```bash
-chmod +x Omarchy-Theme-Studio-0.2.0-x86_64.AppImage
-./Omarchy-Theme-Studio-0.2.0-x86_64.AppImage
+chmod +x Omarchy-Theme-Studio-0.3.0-x86_64.AppImage
+./Omarchy-Theme-Studio-0.3.0-x86_64.AppImage install
+omarchy-theme-studio
 ```
 
-No Node.js, API key or account is needed to run the download. This release targets **x86_64 Omarchy desktops** with `colors.toml` theme templates. Older Omarchy releases and ARM machines are not tested. If FUSE is unavailable, try `./Omarchy-Theme-Studio-0.2.0-x86_64.AppImage --appimage-extract-and-run`. Do not run the app as root or disable its sandbox.
+The executable lives at `~/.local/share/omarchy-theme-studio/app.AppImage`; a wrapper is installed at `~/.local/bin/omarchy-theme-studio`. If that directory is not on your PATH, use the full wrapper path or log in again. Existing launcher/desktop files are backed up once with a `.before-studio-install` suffix.
+
+No Node.js, API key or Studio account is needed to run the download or CLI. This release targets **x86_64 Omarchy desktops** with `colors.toml` theme templates. Older Omarchy releases and ARM machines are not tested. If FUSE is unavailable, try `./Omarchy-Theme-Studio-0.3.0-x86_64.AppImage --appimage-extract-and-run`. Do not run as root or disable the sandbox.
+
+## App updates
+
+Studio checks GitHub Releases when it opens and shows a notification when an update is available. This check can be disabled in **Install & updates**. Checks contact GitHub; they do not send projects, AI credentials or wallpapers. Offline startup remains usable.
+
+Choose **Download & install update**, then save your project and choose **Restart installed Studio**. Downloads are checked against the release SHA-256 checksum before replacing the installed executable. The previous executable is retained; use **Restore previous app version** or `omarchy-theme-studio rollback --yes` to recover. Updates do not automatically restart the app or alter your theme/projects. The checksum verifies integrity against the same GitHub release; it is not an independent publisher signature.
+
+Versions before 0.3.0 need one manual download of this release to gain in-app installation and updates. Updates require the built-in permanent installation and access to GitHub.
+
+## Terminal commands
+
+No command opens the desktop app. Commands also work directly on the downloaded AppImage, and headless commands need neither a display nor a separate Node.js installation.
+
+```bash
+omarchy-theme-studio --help
+omarchy-theme-studio --version
+omarchy-theme-studio themes
+omarchy-theme-studio agents
+omarchy-theme-studio generate --name Forest --colors '#223344,#88aa77' --output forest.json
+omarchy-theme-studio generate --name Amber --agent codex --prompt 'Slate navy and warm amber' --output amber.json
+omarchy-theme-studio export forest.json --output forest.tar.gz
+omarchy-theme-studio apply forest.json --apps cursor --yes
+omarchy-theme-studio verify forest.json
+omarchy-theme-studio undo --yes
+omarchy-theme-studio keep
+omarchy-theme-studio update --check
+omarchy-theme-studio update --yes
+omarchy-theme-studio rollback --yes
+```
+
+`generate` supports `--wallpaper FILE` (repeat up to eight times), `--base THEME`, `--choice 1|2|3`, `--model MODEL`, and `--response FILE` for copied AI output. Wallpaper extraction in the CLI uses ImageMagick’s `magick` command; colour samples, saved projects, AI and the GUI do not need it. CLI `prompt --prompt 'your direction'` prints a portable AI request. Custom harnesses use `--agent custom --command EXECUTABLE --args '["--print"]'`.
+
+Existing generated-project and export files are not silently overwritten. `apply`, `undo`, `update` and `rollback` ask for confirmation in an interactive terminal; scripts must supply `--yes`. App updates and theme edits use separate locks, with desktop and CLI theme operations sharing the same journal and lock. Projects and theme backups remain after app updates or rollback.
 
 ## What it does
 
@@ -27,7 +65,7 @@ No Node.js, API key or account is needed to run the download. This release targe
 
 Omarchy generates desktop and terminal settings with its own installed templates and runs its normal app integrations and existing hooks. Studio does not add another sync hook. Extra editor syncing happens only when applying through Studio. Restarting applications and verifying their rendered appearance remain manual. The preview is illustrative; compositor transparency and app-specific overrides can alter the result.
 
-Cloudroom, Codex, Zen, GTK and other app-specific repair workflows in the original skill are **not additional Studio integrations in v0.2**. Omarchy may already support some of them. The app reports what it checks without claiming whole-desktop visual verification. External hooks can make changes outside Studio’s backup scope.
+Cloudroom, Codex, Zen, GTK and other app-specific repair workflows in the original skill are **not additional Studio integrations in v0.3**. Omarchy may already support some of them. The app reports what it checks without claiming whole-desktop visual verification. External hooks can make changes outside Studio’s backup scope.
 
 ## Optional AI: subscriptions, any harness, or API
 

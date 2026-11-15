@@ -6,6 +6,9 @@ import {StudioSystem,slug} from './system.js';
 import {suggest} from './ai.js';
 import {AgentRunner,installedAgents} from './agents.js';
 import {buildPrompt} from './agent-protocol.js';
+import {Lifecycle} from './lifecycle.js';
+import {spawn} from 'node:child_process';
+const lifecycle=new Lifecycle({version:app.getVersion()});
 const runner=new AgentRunner();
 import {validate,complete,variants} from './palette.js';
 const root=path.dirname(fileURLToPath(import.meta.url)),smoke=process.argv.includes('--smoke-test');
@@ -84,6 +87,22 @@ handle('agents',()=>installedAgents());
 handle('runAgent',options=>{if(smoke)throw new Error('External agent runs are disabled in smoke tests.');return runner.run(options);});
 handle('cancelAgent',()=>runner.cancel());
 handle('copyPrompt',options=>{clipboard.writeText(buildPrompt(options));return true;});
+handle('appStatus',()=>lifecycle.status());
+handle('autoCheck',enabled=>lifecycle.setAutoCheck(enabled));
+handle('installApp',async()=>{if(smoke)throw new Error('Installation is disabled in smoke tests.');return lifecycle.install(path.join(root,'../assets/icon.png'));},true);
+handle('checkUpdate',()=>smoke?{available:false,current:app.getVersion(),version:app.getVersion()}:lifecycle.check());
+handle('downloadUpdate',async()=>{if(smoke)throw new Error('Updates are disabled in smoke tests.');return lifecycle.update();},true);
+handle('rollbackApp',async()=>{if(smoke)throw new Error('Rollback is disabled in smoke tests.');return lifecycle.rollback();},true);
+handle('restartApp',async()=>{
+  if(smoke)throw new Error('Restart is disabled in smoke tests.');
+  if(runner.active||busy)throw new Error('Wait for the current operation to finish before restarting.');
+  if(!await fs.stat(lifecycle.target).catch(()=>null))throw new Error('Install Studio before restarting.');
+  const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+  // Launch the installed AppImage runtime rather than an executable in a temporary mount.
+  await new Promise((resolve,reject)=>{const child=spawn(lifecycle.target,[],{detached:true,stdio:'ignore',env});child.once('error',reject);child.once('spawn',()=>{child.unref();resolve();});});
+  setTimeout(()=>app.quit(),100);return true;
+});
+
 await win.loadFile(path.join(root,'index.html'));
 if(smoke) {
   try {
@@ -98,7 +117,7 @@ if(smoke) {
     await new Promise(resolve=>setTimeout(resolve,300));
     await fs.writeFile(path.join(app.getPath('userData'),'smoke.png'),(await win.webContents.capturePage()).toPNG());
     const reply=JSON.stringify(variants());
-    const result=await win.webContents.executeJavaScript(`new Promise((resolve,reject)=>{let n=0;const timer=setInterval(()=>{if(document.querySelectorAll('.palette-card').length===3){clearInterval(timer);try{document.querySelector('#connection-mode').value='manual';document.querySelector('#connection-mode').dispatchEvent(new Event('change'));if(document.querySelector('#manual-connection').hidden)throw Error('Manual connection hidden');document.querySelector('#brief').value='Smoke test theme';document.querySelector('#brief').dispatchEvent(new Event('input'));if(!document.querySelector('#portable-prompt').value.includes('Smoke test theme'))throw Error('Portable request missing prompt');document.querySelector('#agent-response').value=${JSON.stringify(reply)};document.querySelector('#import-response').click();if(document.querySelector('#step1').hidden)throw Error('Imported palettes not shown');document.querySelectorAll('.palette-card')[1].click();document.querySelector('#mode').click();if(document.querySelector('#advanced').hidden)throw Error('Advanced editor hidden');document.querySelector('[data-step="3"]').click();if(document.querySelector('#step3').hidden)throw Error('Review not visible');resolve({cards:3,advanced:true,review:true,manualExchange:true,title:document.title});}catch(e){reject(e);}}else if(++n>100){clearInterval(timer);reject(Error('UI did not load'));}},100);})`);
+    const result=await win.webContents.executeJavaScript(`new Promise((resolve,reject)=>{let n=0;const timer=setInterval(()=>{if(document.querySelectorAll('.palette-card').length===3){clearInterval(timer);try{document.querySelector('#connection-mode').value='manual';document.querySelector('#connection-mode').dispatchEvent(new Event('change'));if(document.querySelector('#manual-connection').hidden)throw Error('Manual connection hidden');document.querySelector('#brief').value='Smoke test theme';document.querySelector('#brief').dispatchEvent(new Event('input'));if(!document.querySelector('#portable-prompt').value.includes('Smoke test theme'))throw Error('Portable request missing prompt');document.querySelector('#agent-response').value=${JSON.stringify(reply)};document.querySelector('#import-response').click();if(document.querySelector('#step1').hidden)throw Error('Imported palettes not shown');document.querySelectorAll('.palette-card')[1].click();document.querySelector('#mode').click();if(document.querySelector('#advanced').hidden)throw Error('Advanced editor hidden');document.querySelector('[data-step="3"]').click();if(document.querySelector('#step3').hidden)throw Error('Review not visible');document.querySelector('#app-settings').click();if(!document.querySelector('#app-dialog').open)throw Error('App settings hidden');document.querySelector('#close-app-settings').click();resolve({cards:3,advanced:true,review:true,manualExchange:true,appSettings:true,title:document.title});}catch(e){reject(e);}}else if(++n>100){clearInterval(timer);reject(Error('UI did not load'));}},100);})`);
     console.log('STUDIO_SMOKE_OK',JSON.stringify(result));app.exit(0);
   }catch(error){console.error(error);app.exit(1);}
 }

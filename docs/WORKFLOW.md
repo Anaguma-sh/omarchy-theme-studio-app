@@ -26,3 +26,9 @@
 - Desktop and packaged-AppImage smoke checks cover navigation, advanced mode, wallpaper extraction, export and copy/paste palette import. Desktop changes and external agent launches are disabled in smoke checks.
 - A live generation through an existing ChatGPT-authenticated Codex CLI succeeded without supplying an API key to Studio.
 - Claude Code, Gemini CLI and OpenCode argument shapes were checked against installed CLI help and official documentation. Their live provider sessions were not tested. Custom adapters were tested with local fixture commands.
+
+## v0.3 additions
+
+Per-user installation, startup update checks, explicit download/restart, checksum verification, previous app recovery and a headless CLI. Desktop/CLI theme operations use the same journal and lock. The UI adds an Install & updates dialog; a broader UI/UX redesign is deferred for joint review.
+
+The v0.3 test suite contains 32 tests, including installation/update integrity, rollback preservation, no unintended downgrades, CLI export and shared operation locks. Packaged CLI generation, wallpaper extraction, export, installation and wrapper launch were checked without a display.
