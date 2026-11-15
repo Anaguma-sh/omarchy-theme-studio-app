@@ -64,7 +64,7 @@ test('symlinked config files are refused and original target untouched',async t=
   await fs.symlink(path.dirname(target),path.join(home,'linked'));await assert.rejects(safeWrite(path.join(home,'linked/new'),'bad',home),/symlink/);
 });
 test('theme archive round-trips with wallpapers',async t=>{
-  const {system,home}=await fixture(t);const png=path.join(home,'a.png');await fs.writeFile(png,Buffer.from('test asset'));const dest=path.join(home,'theme.tar.gz');
+  const {system,home}=await fixture(t);const png=path.join(home,'a.png');await fs.copyFile(new URL('../assets/icon.png',import.meta.url),png);const dest=path.join(home,'theme.tar.gz');
   // Use real tar only for archive operations, keeping desktop commands mocked.
   const {execFile}=await import('node:child_process');const {promisify}=await import('node:util');const exec=promisify(execFile);const mock=system.run;system.run=(cmd,args,opts)=>cmd==='tar'?exec(cmd,args,opts):mock(cmd,args,opts);
   await system.export({...project,wallpapers:[{path:png}]},dest);const {stdout}=await exec('tar',['-tzf',dest]);assert.match(stdout,/test-forest\/colors.toml/);assert.match(stdout,/backgrounds\/01.png/);assert.doesNotMatch(stdout,/settings.json|pending.json/);

@@ -58,3 +58,8 @@ test('placeholders inside user prompts and model names remain literal',()=>{
   assert.match(agentInvocation(input,'/tmp/o').args[0],/Keep \{model\} literal/);
   assert.ok(agentInvocation({agent:'codex',brief,model:'model-{output}'},'/tmp/o').args.includes('model-{output}'));
 });
+test('agent sandbox hides unrelated files and removes secret environment variables',async t=>{
+ const home=path.join(os.homedir(),'.studio-private-fixture-'+Date.now());await fs.writeFile(home,'private');t.after(()=>fs.rm(home,{force:true}));process.env.STUDIO_TEST_SECRET='should-not-leak';t.after(()=>delete process.env.STUDIO_TEST_SECRET);
+ const code=`const fs=require('fs');if(process.env.STUDIO_TEST_SECRET||fs.existsSync(${JSON.stringify(home)}))process.exit(9);console.log(${JSON.stringify(json)});`;
+ assert.deepEqual(await new AgentRunner().run(custom(code)),palettes);
+});

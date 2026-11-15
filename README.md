@@ -4,29 +4,29 @@ A standalone Linux desktop app for designing and applying Omarchy themes. Start 
 
 ## Download and run
 
-Download **Omarchy-Theme-Studio-0.3.0-x86_64.AppImage** from [GitHub Releases](https://github.com/Anaguma-sh/omarchy-theme-studio-app/releases/latest).
+Download **Omarchy-Theme-Studio-0.4.0-x86_64.AppImage** from [GitHub Releases](https://github.com/Anaguma-sh/omarchy-theme-studio-app/releases/latest).
 
 Allow the file to run as a program and open it. Choose **Install & updates → Install on this computer**. Studio creates a permanent installation, desktop launcher and `omarchy-theme-studio` terminal command. No administrator password is needed.
 
 Or install directly from a terminal:
 
 ```bash
-chmod +x Omarchy-Theme-Studio-0.3.0-x86_64.AppImage
-./Omarchy-Theme-Studio-0.3.0-x86_64.AppImage install
+chmod +x Omarchy-Theme-Studio-0.4.0-x86_64.AppImage
+./Omarchy-Theme-Studio-0.4.0-x86_64.AppImage install
 omarchy-theme-studio
 ```
 
 The executable lives at `~/.local/share/omarchy-theme-studio/app.AppImage`; a wrapper is installed at `~/.local/bin/omarchy-theme-studio`. If that directory is not on your PATH, use the full wrapper path or log in again. Existing launcher/desktop files are backed up once with a `.before-studio-install` suffix.
 
-No Node.js, API key or Studio account is needed to run the download or CLI. This release targets **x86_64 Omarchy desktops** with `colors.toml` theme templates. Older Omarchy releases and ARM machines are not tested. If FUSE is unavailable, try `./Omarchy-Theme-Studio-0.3.0-x86_64.AppImage --appimage-extract-and-run`. Do not run as root or disable the sandbox.
+No Node.js, API key or Studio account is needed to run the download or CLI. This release targets **x86_64 Omarchy desktops** with `colors.toml` theme templates. Older Omarchy releases and ARM machines are not tested. If FUSE is unavailable, try `./Omarchy-Theme-Studio-0.4.0-x86_64.AppImage --appimage-extract-and-run`. Do not run as root or disable the sandbox.
 
 ## App updates
 
 Studio checks GitHub Releases when it opens and shows a notification when an update is available. This check can be disabled in **Install & updates**. Checks contact GitHub; they do not send projects, AI credentials or wallpapers. Offline startup remains usable.
 
-Choose **Download & install update**, then save your project and choose **Restart installed Studio**. Downloads are checked against the release SHA-256 checksum before replacing the installed executable. The previous executable is retained; use **Restore previous app version** or `omarchy-theme-studio rollback --yes` to recover. Updates do not automatically restart the app or alter your theme/projects. The checksum verifies integrity against the same GitHub release; it is not an independent publisher signature.
+Choose **Download & install update**, then save your project and choose **Restart installed Studio**. Downloads are checked against the release SHA-256 checksum before replacing the installed executable. The previous executable is retained; use **Restore previous app version** or `omarchy-theme-studio rollback --yes` to recover. Updates do not automatically restart the app or alter your theme/projects. From 0.4 onward the checksum manifest must also have a valid Ed25519 signature verified using the app’s embedded public key.
 
-Versions before 0.3.0 need one manual download of this release to gain in-app installation and updates. Updates require the built-in permanent installation and access to GitHub.
+Install 0.4.0 directly once to establish the signed-update trust key. Updates require the built-in permanent installation and access to GitHub.
 
 ## Terminal commands
 
@@ -65,13 +65,13 @@ Existing generated-project and export files are not silently overwritten. `apply
 
 Omarchy generates desktop and terminal settings with its own installed templates and runs its normal app integrations and existing hooks. Studio does not add another sync hook. Extra editor syncing happens only when applying through Studio. Restarting applications and verifying their rendered appearance remain manual. The preview is illustrative; compositor transparency and app-specific overrides can alter the result.
 
-Cloudroom, Codex, Zen, GTK and other app-specific repair workflows in the original skill are **not additional Studio integrations in v0.3**. Omarchy may already support some of them. The app reports what it checks without claiming whole-desktop visual verification. External hooks can make changes outside Studio’s backup scope.
+Cloudroom, Codex, Zen, GTK and other app-specific repair workflows in the original skill are **not additional Studio integrations in v0.4**. Omarchy may already support some of them. The app reports what it checks without claiming whole-desktop visual verification. External hooks can make changes outside Studio’s backup scope.
 
 ## Optional AI: subscriptions, any harness, or API
 
 An API key is **not required** for prompts. Choose one of three connection modes:
 
-1. **Signed-in agent.** Install and sign in to an agent in your terminal, then choose it in Studio. Presets are included for Codex, Claude Code, Gemini CLI and OpenCode. Studio launches the official CLI and reuses its login and provider configuration without copying credentials. Leave the model blank to use the harness default, or enter any model that connection supports. Claude Code and OpenCode also expose a named-agent field.
+1. **Signed-in agent.** Install and sign in to an agent in your terminal, then choose it in Studio. Presets are included for Codex, Claude Code, Gemini CLI and OpenCode. Studio launches the official CLI and reuses its login and provider configuration using a temporary copy of the selected provider’s login/config files. Leave the model blank to use the harness default, or enter any model that connection supports. Claude Code and OpenCode also expose a named-agent field.
 2. **Copy/paste.** Copy Studio’s request into any AI chat, agent or model you already use. Paste its response back into Studio to compare and edit the palettes. This works with subscription apps that have no automation interface.
 3. **API or local server.** An optional Chat Completions endpoint for API users and local servers. The API key can be blank for servers that do not require authentication. A chat website such as `https://openai.com/` is not an API endpoint; Studio explains which connection to use instead.
 
@@ -93,7 +93,7 @@ Choose **Custom command**. Enter an executable name or absolute path and a JSON 
 
 The command runs without a shell in a temporary directory. It must exit and return three palettes as JSON, either on stdout or in `{output}`. Plain JSON, markdown-fenced JSON and common response envelopes/JSON event streams are accepted. Interactive-only tools can use copy/paste instead. Prompts run for at most three minutes and can be cancelled. Studio does not install or configure harnesses for you.
 
-Studio supplies only your description and extracted hex colour samples. Images and wallpaper paths are not included. The selected harness manages its own context, permissions, history and billing; custom commands run with your user permissions. Built-in presets use text-only or read-only options where available. Studio’s API keys stay in memory and are not saved in projects or settings. Local palette generation always works without an AI connection.
+Studio supplies only your description and extracted hex colour samples. Images and wallpaper paths are not included. The selected harness manages its own context, permissions, history and billing; custom commands run inside the same filesystem and environment isolation. Built-in presets use text-only or read-only options where available. Studio’s API keys stay in memory and are not saved in projects or settings. Local palette generation always works without an AI connection.
 
 ## Based on the Omarchy Theme Studio workflow
 
@@ -116,3 +116,11 @@ The AppImage is written to `dist/`. Electron bundles the runtime; the app uses p
 Tests use temporary directories and mocked desktop commands; they do not alter your active theme. `npm start -- --smoke-test` exercises navigation, palette selection, advanced mode and the copy/paste exchange with desktop changes disabled.
 
 See [release instructions](docs/RELEASING.md) and [workflow coverage](docs/WORKFLOW.md). MIT licensed; bundled third-party software retains its own licences. Wallpaper rights remain with their owners.
+
+## Security requirements (0.4+)
+
+- Install 0.4.0 directly once to establish the embedded Ed25519 update key. Older versions cannot retroactively verify publisher signatures. Future updates require both `SHA256SUMS` and `SHA256SUMS.sig` signed with the trusted key; a checksum alone is rejected.
+- Direct agent execution requires `/usr/bin/bwrap` (bubblewrap). There is no unrestricted fallback. Provider networking remains available, so this is filesystem/environment isolation, not a network firewall.
+- Agents see system runtime directories read-only, their temporary workspace and a minimal copy of the selected provider’s login files. Unrelated home files, SSH sockets, desktop session credentials and inherited environment secrets are excluded. Provider login copies are deleted after execution. Keychain-only login, external credential helpers and some custom harness setups may need copy/paste mode. Token refresh in the temporary copy does not update the original login; reauthenticate in the provider CLI if required.
+- Imported GUI projects do not automatically open referenced wallpaper paths. Re-select images through the file picker. CLI export/apply requires `--allow-wallpapers` to authorise the inspected paths. Symbolic links and non-image contents are rejected; images are limited to 40 MB, 8192 pixels per side and 32 megapixels.
+- Only the repository owner currently has write access. Active branch/tag rules restrict changes to repository admins; GitHub Actions defaults to read-only. Forks can be modified independently and proposed through pull requests. Repository administrators and a compromised owner account remain trusted administrative boundaries.

@@ -5,6 +5,7 @@ import {parseArgs} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline/promises';
 import {StudioSystem,slug} from './system.js';
+import {readWallpaper} from './wallpaper.js';
 import {Lifecycle} from './lifecycle.js';
 import {AgentRunner,installedAgents} from './agents.js';
 import {buildPrompt,parsePalettes} from './agent-protocol.js';
@@ -46,7 +47,7 @@ export async function readProject(file){
 }
 async function confirm(message,yes){if(yes)return;if(!process.stdin.isTTY)throw new Error('Use --yes to confirm this operation in a non-interactive terminal.');const rl=createInterface({input:process.stdin,output:process.stderr});try{if((await rl.question(message+' [y/N] ')).trim().toLowerCase()!=='y')throw new Error('Cancelled.');}finally{rl.close();}}
 export async function runCLI(argv,{system=new StudioSystem({data:path.join(process.env.XDG_CONFIG_HOME||path.join(os.homedir(),'.config'),'omarchy-theme-studio/backups')}),lifecycle=new Lifecycle({version:metadata.version}),write=value=>console.log(typeof value==='string'?value:JSON.stringify(value,null,2))}={}){
-  const {values:v,positionals}=parseArgs({args:argv,allowPositionals:true,options:Object.fromEntries(['help','version','yes','check'].map(k=>[k,{type:'boolean'}]).concat(['name','output','colors','wallpaper','base','choice','agent','prompt','model','command','args','response','apps'].map(k=>[k,{type:'string',...(k==='wallpaper'?{multiple:true}:{})}])))});
+  const {values:v,positionals}=parseArgs({args:argv,allowPositionals:true,options:Object.fromEntries(['help','version','yes','check','allow-wallpapers'].map(k=>[k,{type:'boolean'}]).concat(['name','output','colors','wallpaper','base','choice','agent','prompt','model','command','args','response','apps'].map(k=>[k,{type:'string',...(k==='wallpaper'?{multiple:true}:{})}])))});
   const [command,...files]=positionals;
   if(v.help){write(help);return;}if(v.version){write(metadata.version);return;}
   if(files.length>1)throw new Error('Too many positional arguments.');
@@ -61,7 +62,7 @@ export async function runCLI(argv,{system=new StudioSystem({data:path.join(proce
   if(command==='generate'){
     slug(v.name);const samples=v.colors?.split(',')||[];if(samples.some(c=>!/^#[a-f\d]{6}$/i.test(c)))throw new Error('Colours must be comma-separated six-digit hex values.');
     const wallpapers=(v.wallpaper||[]).map(file=>({path:path.resolve(file)}));if(wallpapers.length>8)throw new Error('Choose up to eight wallpapers.');
-    for(const image of wallpapers){if(!/\.(png|jpe?g|webp)$/i.test(image.path))throw new Error('Choose PNG, JPEG or WebP wallpapers.');if((await fs.stat(image.path)).size>40*1024*1024)throw new Error('Wallpaper exceeds 40 MB.');const {stdout}=await system.command('magick',[image.path,'-resize','96x96!','-depth','8','rgb:-'],{encoding:'buffer'}).catch(error=>{if(error.code==='ENOENT')throw new Error('Wallpaper extraction needs ImageMagick (magick). Use --colors instead or generate in the desktop app.');throw error;});const bins=new Map();for(let i=0;i+2<stdout.length;i+=3){const c='#'+[...stdout.subarray(i,i+3)].map(v=>Math.min(255,Math.round(v/24)*24).toString(16).padStart(2,'0')).join('');bins.set(c,(bins.get(c)||0)+1);}samples.push(...[...bins].sort((a,b)=>b[1]-a[1]).slice(0,16).map(([c])=>c));}
+    for(const image of wallpapers){await readWallpaper(image.path);if(!/\.(png|jpe?g|webp)$/i.test(image.path))throw new Error('Choose PNG, JPEG or WebP wallpapers.');if((await fs.stat(image.path)).size>40*1024*1024)throw new Error('Wallpaper exceeds 40 MB.');const {stdout}=await system.command('magick',[image.path,'-resize','96x96!','-depth','8','rgb:-'],{encoding:'buffer'}).catch(error=>{if(error.code==='ENOENT')throw new Error('Wallpaper extraction needs ImageMagick (magick). Use --colors instead or generate in the desktop app.');throw error;});const bins=new Map();for(let i=0;i+2<stdout.length;i+=3){const c='#'+[...stdout.subarray(i,i+3)].map(v=>Math.min(255,Math.round(v/24)*24).toString(16).padStart(2,'0')).join('');bins.set(c,(bins.get(c)||0)+1);}samples.push(...[...bins].sort((a,b)=>b[1]-a[1]).slice(0,16).map(([c])=>c));}
     let options=variants(samples);
     if(v.base){const theme=(await system.inventory()).themes.find(t=>t.name===v.base);if(!theme)throw new Error('Installed base theme not found.');options[0]={name:theme.name,palette:theme.palette};}
     if(v.response){if((await fs.stat(v.response)).size>1024*1024)throw new Error('Response exceeds 1 MB.');options=parsePalettes(await fs.readFile(v.response,'utf8'));}
@@ -73,6 +74,7 @@ export async function runCLI(argv,{system=new StudioSystem({data:path.join(proce
   }
   if(['export','apply','verify'].includes(command)){
     const project=await readProject(files[0]);
+    if(project.wallpapers.length&&!v['allow-wallpapers'])throw new Error('Project contains local wallpaper references. Inspect them and pass --allow-wallpapers only if you trust those paths.');
     if(command==='export'){if(!v.output)throw new Error('Supply --output for the theme archive.');if(await fs.stat(v.output).catch(()=>null))throw new Error('Output already exists. Choose a new file.');write(await system.export(project,path.resolve(v.output)));return;}
     if(command==='verify'){write(await system.verify(project.palette));return;}
     const apps=v.apps?v.apps.split(','):[];if(apps.some(a=>!['cursor','code'].includes(a)))throw new Error('Supported extra apps: cursor,code.');

@@ -1,14 +1,9 @@
-## Omarchy Theme Studio 0.3.0
+## Omarchy Theme Studio 0.4.0 — security update
 
-- Built-in per-user installer with permanent app storage, desktop launcher and terminal command. No sudo needed.
-- Automatic startup update checks, with an opt-out. Download updates in the app and restart when ready.
-- SHA-256 verification before replacement, previous executable backup and app rollback.
-- Headless CLI for generation, signed-in agents, copied AI responses, export, theme apply/undo/keep, verification, installation, updates and app rollback.
-- Shared locking prevents desktop and CLI theme operations from editing the same journal concurrently.
-- Added only the install/update controls needed for these features. The broader UI/UX review remains a separate session with the user.
+- Imported wallpaper references require renewed authorisation. Symbolic links, non-images and excessive dimensions are rejected.
+- Update manifests require an Ed25519 publisher signature as well as SHA-256 verification. Forged or unsigned releases are rejected.
+- Agent commands run through mandatory bubblewrap isolation with a filtered environment and temporary provider-specific login copies. Unrelated home files and environment secrets are not exposed. Networking is retained for providers; keychain-only and unsupported custom setups can use copy/paste.
+- Patched build-tool dependency overrides remove the reported minimatch advisory.
+- Owner-only branch/tag rules and read-only default Actions permissions are active on the upstream repository.
 
-Download this release manually once if you are on 0.2.0 or earlier. Open it and select Install & updates → Install on this computer, or run the AppImage with `install`. Future releases can be downloaded from inside Studio.
-
-No API key is required for signed-in agent or copy/paste modes. Local generation remains available without an AI connection.
-
-Automated tests cover installation, checksum failures, update/rollback, locks, CLI generation/export and the existing theme/agent workflows. Desktop and AppImage smoke checks exercise the interface. Wallpaper extraction in the CLI requires ImageMagick; other headless commands use the bundled runtime.
+Download and install 0.4.0 directly once to establish signed-update trust. The signing protection cannot be retrofitted into older running versions. Bubblewrap is required for direct agent mode; there is no unsafe fallback. The broader UI/UX review remains deferred.

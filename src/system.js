@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import {readWallpaper} from './wallpaper.js';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createHash,randomUUID} from 'node:crypto';
@@ -50,9 +51,9 @@ export class StudioSystem {
     await fs.writeFile(path.join(directory,'studio.json'),JSON.stringify({version:1,name,palette},null,2));
     for(const [i,image] of (project.wallpapers||[]).entries()) {
       if(typeof image.path!=='string'||!/^\.(png|jpe?g|webp)$/i.test(path.extname(image.path))) throw new Error('Only PNG, JPEG and WebP wallpapers are supported.');
-      if((await fs.stat(image.path)).size>40*1024*1024) throw new Error('Wallpaper exceeds 40 MB.');
+      const bytes=await readWallpaper(image.path);
       const dest=path.join(directory,'backgrounds',`${String(i+1).padStart(2,'0')}${path.extname(image.path).toLowerCase()}`);
-      await fs.mkdir(path.dirname(dest),{recursive:true});await fs.copyFile(image.path,dest);
+      await fs.mkdir(path.dirname(dest),{recursive:true});await fs.writeFile(dest,bytes);
     }
     await fs.writeFile(path.join(directory,'README.md'),`# ${name}\n\nGenerated with Omarchy Theme Studio. Copy this directory to ~/.config/omarchy/themes/${name}/ and run:\n\n    omarchy theme set ${name}\n\nOmarchy generates app settings using its installed templates. Wallpaper rights remain with their original owners.\n`);
     return name;

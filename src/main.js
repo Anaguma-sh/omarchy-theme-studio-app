@@ -6,6 +6,7 @@ import {StudioSystem,slug} from './system.js';
 import {suggest} from './ai.js';
 import {AgentRunner,installedAgents} from './agents.js';
 import {buildPrompt} from './agent-protocol.js';
+import {readWallpaper} from './wallpaper.js';
 import {Lifecycle} from './lifecycle.js';
 import {spawn} from 'node:child_process';
 const lifecycle=new Lifecycle({version:app.getVersion()});
@@ -21,9 +22,8 @@ function project(input) {
   return p;
 }
 async function inspectImage(file) {
-  const stat=await fs.stat(file);if(stat.size>40*1024*1024)throw new Error('Choose images smaller than 40 MB.');
-  if(!/\.(png|jpe?g|webp)$/i.test(file))throw new Error('Choose PNG, JPEG or WebP wallpapers.');
-  const image=nativeImage.createFromPath(file);if(image.isEmpty())throw new Error('Could not decode wallpaper.');
+  const bytes=await readWallpaper(file);
+  const image=nativeImage.createFromBuffer(bytes);if(image.isEmpty())throw new Error('Could not decode wallpaper.');
   const small=image.resize({width:96,height:96,quality:'good'}),bitmap=small.toBitmap(),bins=new Map();
   for(let i=0;i<bitmap.length;i+=4) {
     if(bitmap[i+3]<128)continue;
@@ -66,9 +66,7 @@ handle('load',async()=>{
   const data=JSON.parse(await fs.readFile(file,'utf8'));if(data.version!==1)throw new Error('Unsupported project version.');
   slug(data.name);validate(data.palette);
   if(!Array.isArray(data.wallpapers)||data.wallpapers.length>8)throw new Error('Invalid wallpaper list.');
-  const images=[],missing=[];
-  for(const image of data.wallpapers){try{images.push(await inspectImage(image.path));}catch{missing.push(image.path);}}
-  return {name:data.name,palette:complete(data.palette),wallpapers:images,missing};
+  return {name:data.name,palette:complete(data.palette),wallpapers:[],missing:data.wallpapers.length?['Imported wallpaper references were skipped. Re-select your wallpaper files to authorise access.']:[]};
 });
 handle('apply',async(input,selected)=>{
   if(smoke)throw new Error('Desktop changes are disabled in smoke tests.');

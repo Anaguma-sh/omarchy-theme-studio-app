@@ -14,7 +14,7 @@ To publish an already-tested local build with GitHub CLI:
 ```bash
 sha256sum dist/*.AppImage > dist/SHA256SUMS
 # Run from the repository after pushing its version tag.
-gh release create v0.3.0 dist/*.AppImage dist/SHA256SUMS --title 'Omarchy Theme Studio 0.3.0' --notes-file docs/RELEASE-NOTES.md
+gh release create v0.4.0 dist/*.AppImage dist/SHA256SUMS --title 'Omarchy Theme Studio 0.4.0' --notes-file docs/RELEASE-NOTES.md
 ```
 
 Production dependencies are limited to `jsonc-parser`. Run `npm audit --omit=dev` for the shipped dependency tree. Electron-builder also pulls development-only Windows/macOS packaging dependencies; review those separately when updating the build toolchain.
@@ -24,3 +24,9 @@ Production dependencies are limited to `jsonc-parser`. Run `npm audit --omit=dev
 Every stable release must include its versioned x86_64 AppImage and a `SHA256SUMS` file with a line containing that asset’s basename. The built-in updater reads the public latest-release API and only selects assets in this repository’s version-tag download path. Publish stable releases only after testing. No updater-specific manifest is required by this app’s full-download updater.
 
 Test the AppImage CLI with `DISPLAY` and `WAYLAND_DISPLAY` unset. Check `--version`, generation and export, then install under a temporary HOME and run the generated wrapper. Test update checks and a real release download in an isolated installation before declaring update support verified.
+
+## Signed releases (required for 0.4+)
+
+Run `npm run sign-release` after building. Upload the AppImage, `dist/SHA256SUMS` and `dist/SHA256SUMS.sig`. The private Ed25519 key is stored outside the repo under `~/.local/share/omarchy-theme-studio-release/signing-key.pem` (mode 0600), or supplied by `STUDIO_SIGNING_KEY`. Back it up securely. Never commit or publish it. Losing it requires a deliberate trust-key migration; do not silently replace the embedded public key for ordinary releases. Fork maintainers must generate their own keys and change the update repository before publishing their own updates.
+
+The workflow template predates signed releases and is not enabled. Do not enable automatic publishing until signing is integrated using an owner-controlled release process. GitHub Actions is intentionally read-only by default.

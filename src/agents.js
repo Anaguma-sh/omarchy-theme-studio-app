@@ -1,3 +1,4 @@
+import {isolatedAgent} from './agent-sandbox.js';
 import {spawn} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -52,15 +53,16 @@ export class AgentRunner {
       directory=await fs.mkdtemp(path.join(os.tmpdir(),'theme-studio-agent-'));
       const output=path.join(directory,'response.txt'),invocation=agentInvocation(options,output);
       if(record.reason)throw new Error(record.reason);
+      const isolated=await isolatedAgent(invocation,directory,options.agent);
       const raw=await new Promise((resolve,reject)=>{
         let stdout='',stderr='',bytes=0,finished=false;
         const finish=(error,value)=>{if(finished)return;finished=true;clearTimeout(timer);error?reject(error):resolve(value);};
-        const child=this.spawnProcess(invocation.command,invocation.args,{cwd:directory,env:{...process.env,NO_COLOR:'1'},shell:false,detached:true,stdio:['pipe','pipe','pipe']});record.child=child;
+        const child=this.spawnProcess(isolated.command,isolated.args,{cwd:directory,env:isolated.env,shell:false,detached:true,stdio:['pipe','pipe','pipe']});record.child=child;
         const timer=setTimeout(()=>record.stop('Agent timed out after three minutes. Try a faster model or use copy/paste.'),this.timeoutMs);
         child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
         const append=(target,chunk)=>{bytes+=Buffer.byteLength(chunk);if(bytes>this.maxBytes){record.stop('Agent output exceeds 1 MB.');return;}if(target==='out')stdout+=chunk.toString();else stderr+=chunk.toString();};
         child.stdout.on('data',chunk=>append('out',chunk));child.stderr.on('data',chunk=>append('err',chunk));
-        child.on('error',error=>finish(new Error(error.code==='ENOENT'?'Agent executable not found. Install it, check its path, or use copy/paste.':`Could not start agent: ${error.message}`)));
+        child.on('error',error=>finish(new Error(error.code==='ENOENT'?'Agent isolation requires bubblewrap (/usr/bin/bwrap). Install it or use copy/paste; Studio will not run agents without isolation.':`Could not start agent: ${error.message}`)));
         child.on('close',code=>{
           if(record.reason)return finish(new Error(record.reason));
           if(code!==0)return finish(new Error(`Agent exited with code ${code}. Open the agent in your terminal to check its login, model and usage limits. ${stderr.replace(/\x1b\[[0-9;]*m/g,'').trim().slice(-1500)}`));

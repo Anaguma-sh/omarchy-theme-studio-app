@@ -1,14 +1,16 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+const trustedUpdateKey=await fs.readFile(fileURLToPath(new URL('./update-public-key.pem',import.meta.url)),'utf8');
+import {createHash,verify} from 'node:crypto';
 import {safeWrite,exists} from './system.js';
 export const repository='Anaguma-sh/omarchy-theme-studio-app';
 export function newer(candidate,current){const parse=v=>{const match=/^v?(\d+)\.(\d+)\.(\d+)$/.exec(v);if(!match)throw new Error('Expected a stable version number.');return match.slice(1).map(Number);};const a=parse(candidate),b=parse(current);for(let i=0;i<3;i++){if(a[i]!==b[i])return a[i]>b[i];}return false;}
 const digest=data=>createHash('sha256').update(data).digest('hex');
 export class Lifecycle {
-  constructor({home=os.homedir(),version='0.3.0',image=process.env.APPIMAGE,fetcher=fetch,onProgress=()=>{}}={}){
-    this.home=home;this.version=version;this.image=image;this.fetcher=fetcher;this.onProgress=onProgress;
+  constructor({home=os.homedir(),version='0.3.0',image=process.env.APPIMAGE,fetcher=fetch,publicKey=trustedUpdateKey,onProgress=()=>{}}={}){
+    this.publicKey=publicKey;this.home=home;this.version=version;this.image=image;this.fetcher=fetcher;this.onProgress=onProgress;
     this.directory=path.join(home,'.local/share/omarchy-theme-studio');this.target=path.join(this.directory,'app.AppImage');this.previous=path.join(this.directory,'previous.AppImage');this.launcher=path.join(home,'.local/bin/omarchy-theme-studio');this.desktop=path.join(home,'.local/share/applications/omarchy-theme-studio.desktop');this.config=path.join(this.directory,'installation.json');this.lock=path.join(this.directory,'operation.lock');
   }
   async settings(){return JSON.parse(await fs.readFile(this.config,'utf8').catch(e=>{if(e.code==='ENOENT')return '{}';throw e;}));}
@@ -56,16 +58,20 @@ export class Lifecycle {
     if(release.draft||release.prerelease)throw new Error('No stable release is available.');
     const version=String(release.tag_name||'').replace(/^v/,'');const settings=await this.settings();const current=(await exists(this.target))?(settings.version||this.version):this.version;const available=newer(version,current);
     const name=`Omarchy-Theme-Studio-${version}-x86_64.AppImage`;
+    const signature=release.assets?.find(a=>a.name==='SHA256SUMS.sig');
     const image=release.assets?.find(a=>a.name===name),checksum=release.assets?.find(a=>a.name==='SHA256SUMS');
-    if(available&&(!image||!checksum))throw new Error('Latest release is missing its AppImage or checksum.');
+    if(available&&(!image||!checksum||!signature))throw new Error('Latest release is missing its AppImage, checksum or signature.');
     const prefix=`https://github.com/${repository}/releases/download/v${version}/`;
-    if(available&&(!image.browser_download_url.startsWith(prefix)||!checksum.browser_download_url.startsWith(prefix)))throw new Error('Unexpected release asset location.');
-    return {available,version,current,url:`https://github.com/${repository}/releases/tag/v${version}`,image:available?image.browser_download_url:null,checksum:available?checksum.browser_download_url:null,name};
+    if(available&&(!image.browser_download_url.startsWith(prefix)||!checksum.browser_download_url.startsWith(prefix)||!signature.browser_download_url.startsWith(prefix)))throw new Error('Unexpected release asset location.');
+    return {available,version,current,url:`https://github.com/${repository}/releases/tag/v${version}`,image:available?image.browser_download_url:null,checksum:available?checksum.browser_download_url:null,signature:available?signature.browser_download_url:null,name};
   }
   async update(){return this.exclusive(async()=>{
     if(!await exists(this.target))throw new Error('Install Studio first so updates have a permanent location.');
     const release=await this.check();if(!release.available)return {updated:false,...release};
-    const sums=(await this.get(release.checksum,1024*1024)).toString();
+    const manifest=await this.get(release.checksum,1024*1024);
+    const signature=(await this.get(release.signature,1024)).toString().trim();
+    if(!/^[A-Za-z0-9+/]{86}==$/.test(signature)||!verify(null,manifest,this.publicKey,Buffer.from(signature,'base64')))throw new Error('Release signature is invalid. Installed app was not replaced.');
+    const sums=manifest.toString();
     const line=sums.split('\n').find(line=>line.trim().split(/\s+/)[1]?.replace(/^\*/,'')===release.name);
     const expected=line?.split(/\s+/)[0];if(!/^[a-f\d]{64}$/i.test(expected||''))throw new Error('Release has no valid SHA-256 checksum.');
     const bytes=await this.get(release.image,250*1024*1024,(received,total)=>this.onProgress({received,total}));

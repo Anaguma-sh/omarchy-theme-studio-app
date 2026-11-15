@@ -1,6 +1,6 @@
 {
   "name": "omarchy-theme-studio",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A local-first Omarchy theme workshop",
   "type": "module",
   "main": "src/bootstrap.cjs",
@@ -10,9 +10,11 @@
     "start": "electron .",
     "test": "node --test",
     "dist": "electron-builder --linux AppImage --x64 --publish never",
-    "check": "node --check src/main.js && node --check src/renderer.js && node --check src/system.js"
+    "check": "node --check src/main.js && node --check src/renderer.js && node --check src/system.js",
+    "sign-release": "node scripts/sign-release.js"
   },
   "dependencies": {
+    "image-size": "^2.1.0",
     "jsonc-parser": "3.3.1"
   },
   "devDependencies": {
@@ -42,5 +44,8 @@
     "type": "git",
     "url": "https://github.com/Anaguma-sh/omarchy-theme-studio-app.git"
   },
-  "desktopName": "omarchy-theme-studio"
+  "desktopName": "omarchy-theme-studio",
+  "overrides": {
+    "minimatch": "^11.0.8"
+  }
 }
